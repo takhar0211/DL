@@ -1,0 +1,91 @@
+
+# 1. Import libraries
+
+import tensorflow as tf
+import numpy as np
+from tensorflow import keras
+from tensorflow.keras import layers
+import matplotlib.pyplot as plt
+
+
+# 2. Build the FNN model
+
+model = keras.Sequential([
+    layers.Flatten(input_shape=(28, 28)),
+    layers.Dense(128, activation='relu'),
+    layers.Dense(10, activation='softmax')
+])
+
+
+# 3. Load the dataset
+
+data = np.load('/digits_dataset_28x28 (1).npz')
+
+x_train = data['x_train']
+y_train = data['y_train']
+
+x_test = data['x_test']
+y_test = data['y_test']
+
+
+# 4. Normalize the images
+
+x_train = x_train / 255.0
+x_test = x_test / 255.0
+
+
+# 5. Compile the model
+
+model.compile(
+    optimizer='sgd',
+    loss='sparse_categorical_crossentropy',
+    metrics=['accuracy']
+)
+
+
+# 6. Train the model
+
+history = model.fit(
+    x_train,
+    y_train,
+    epochs=10,
+    batch_size=32,
+    validation_split=0.1
+)
+
+
+# 7. Print training accuracy
+
+print(history.history['accuracy'])
+
+
+# 8. Evaluate the model
+
+loss, accuracy = model.evaluate(x_test, y_test)
+
+print("Test Loss:", loss)
+print("Test Accuracy:", accuracy)
+
+
+# 9. Plot training and validation accuracy
+
+plt.plot(history.history['accuracy'], label='Training Accuracy')
+plt.plot(history.history['val_accuracy'], label='Validation Accuracy')
+
+plt.xlabel('Epochs')
+plt.ylabel('Accuracy')
+plt.legend()
+plt.show()
+
+
+# 10. Predict an image
+
+image = x_test[0]
+
+prediction = model.predict(image.reshape(1, 28, 28))
+
+predicted = np.argmax(prediction)
+actual = int(y_test[0])
+
+print("Predicted:", predicted)
+print("Actual:", actual)
