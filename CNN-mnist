@@ -1,17 +1,10 @@
-from pathlib import Path
-
-content = """# CNN - Handwritten Digit Classification
-
-# 1. Import libraries
 
 import numpy as np
 import matplotlib.pyplot as plt
 from tensorflow import keras
 from tensorflow.keras import layers
 
-
-# 2. Load dataset
-
+# 1. Load MNIST dataset
 data = np.load('digits_dataset_28x28 (1).npz')
 
 x_train = data['x_train']
@@ -19,15 +12,15 @@ y_train = data['y_train']
 x_test = data['x_test']
 y_test = data['y_test']
 
+# 2. Normalize images
+x_train = x_train.astype('float32') / 255.0
+x_test = x_test.astype('float32') / 255.0
 
-# 3. Normalize images
+# 3. Add channel dimension
+x_train = x_train[..., np.newaxis]
+x_test = x_test[..., np.newaxis]
 
-x_train = x_train / 255.0
-x_test = x_test / 255.0
-
-
-# 4. Build CNN model
-
+# 4. Define CNN architecture
 model = keras.Sequential([
     layers.Input(shape=(28, 28, 1)),
     layers.Conv2D(32, (3, 3), activation='relu'),
@@ -37,80 +30,62 @@ model = keras.Sequential([
     layers.Dense(10, activation='softmax')
 ])
 
+# Display model architecture
+model.summary()
 
 # 5. Compile model
-
 model.compile(
     optimizer='sgd',
     loss='sparse_categorical_crossentropy',
     metrics=['accuracy']
 )
 
-
 # 6. Train model
-
-history = model.fit(x_train, y_train, epochs=5)
-
+history = model.fit(
+    x_train,
+    y_train,
+    epochs=5
+)
 
 # 7. Evaluate model
-
 loss, accuracy = model.evaluate(x_test, y_test)
-print('test accuracy:', accuracy)
 
+print("Test Loss:", loss)
+print("Test Accuracy:", accuracy)
 
 # 8. Plot accuracy
-
 plt.plot(history.history['accuracy'])
-plt.title('accuracy')
-plt.xlabel('epochs')
-plt.ylabel('accuracy')
+plt.title('Model Accuracy')
+plt.xlabel('Epochs')
+plt.ylabel('Accuracy')
 plt.show()
-
 
 # 9. Plot loss
-
 plt.plot(history.history['loss'])
-plt.title('loss')
-plt.xlabel('epochs')
-plt.ylabel('loss')
+plt.title('Model Loss')
+plt.xlabel('Epochs')
+plt.ylabel('Loss')
 plt.show()
 
-
-# 10. Select an image for prediction
-
+# 10. Predict one test image
 image = x_test[0]
 
-
-# 11. Predict the image
-
-prediction = model.predict(image.reshape(1, 28, 28))
-
-
-# 12. Get predicted and actual labels
+prediction = model.predict(image.reshape(1, 28, 28, 1))
 
 predicted = np.argmax(prediction)
 actual = int(y_test[0])
 
-
-# 13. Display the image
-
-plt.imshow(image, cmap='gray')
-plt.title('handwritten digit')
+# 11. Display image
+plt.imshow(image.squeeze(), cmap='gray')
+plt.title('Handwritten Digit')
 plt.axis('off')
 plt.show()
 
-
-# 14. Display prediction result
-
-print('predicted digit:', predicted)
-print('actual digit:', actual)
+# 12. Display prediction
+print("Predicted Digit:", predicted)
+print("Actual Digit:", actual)
 
 if predicted == actual:
-    print('correct!')
+    print("Correct Prediction!")
 else:
-    print('wrong!')
-"""
-
-out = Path("/mnt/data/cnn_mnist_code.txt")
-out.write_text(content, encoding="utf-8")
-print(f"Created: {out}")
+    print("Wrong Prediction!")
