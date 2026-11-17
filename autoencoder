@@ -1,0 +1,186 @@
+# ===== Code Block 1 =====
+# ECG Anomaly Detection using Autoencoder
+import pandas as pd, numpy as np, seaborn as sns, matplotlib.pyplot as plt, tensorflow as tf
+from tensorflow.keras import layers, models
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import MinMaxScaler
+from sklearn.metrics import accuracy_score, confusion_matrix
+
+# ===== Code Block 2 =====
+# Load dataset
+data = pd.read_csv("ecg.xls", header=None)
+X = data.iloc[:, :-1].values
+y = data.iloc[:, -1].values
+
+# ===== Code Block 3 =====
+# Train-Test Split (Novelty detection: train only on normal samples)
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, stratify=y, random_state=42)
+X_train = X_train[y_train == 1]   # only normal samples for training
+
+# ===== Code Block 4 =====
+# Normalize
+scaler = MinMaxScaler()
+X_train_s = scaler.fit_transform(X_train)
+X_test_s  = scaler.transform(X_test)
+# Display shapes after scaling
+print("Train Shape after scaling:", X_train_s.shape)
+print("Test Shape after scaling :", X_test_s.shape)
+
+# ===== Code Block 6 =====
+# Build Autoencoder
+input_dim = X_train_s.shape[1]
+autoencoder = models.Sequential([
+    layers.Input(shape=(input_dim,)),
+    layers.Dense(64, activation='relu'),
+    layers.Dense(32, activation='relu'),
+    layers.Dense(16, activation='relu'),
+    layers.Dense(8, activation='relu'),
+    layers.Dense(16, activation='relu'),
+    layers.Dense(32, activation='relu'),
+    layers.Dense(64, activation='relu'),
+    layers.Dense(input_dim, activation='sigmoid')
+])
+
+# ===== Code Block 7 =====
+autoencoder.compile(optimizer=Adam(0.001),
+                    loss='mean_squared_logarithmic_error',
+                    metrics=['mse'])
+
+# ---------------- Autoencoder Summary ----------------
+autoencoder.summary()
+
+# ===== Code Block 13 =====
+# Train Model
+history = autoencoder.fit(X_train_s, X_train_s,
+                          epochs=20, batch_size=512,
+                          validation_data=(X_test_s, X_test_s),
+                          verbose=1)
+
+# ===== Code Block 15 =====
+# Plot loss
+plt.plot(history.history['loss'], label="Train Loss")
+plt.plot(history.history['val_loss'], label="Validation Loss")
+plt.xlabel("Epochs")
+plt.ylabel("MSE Loss")
+plt.title("Training vs Validation Loss")
+plt.legend()
+plt.show()
+
+# ===== Code Block 16 =====
+# Reconstruction error
+recon_train = autoencoder.predict(X_train_s)
+recon_test  = autoencoder.predict(X_test_s)
+train_err = np.mean(np.square(X_train_s - recon_train), axis=1)
+test_err  = np.mean(np.square(X_test_s - recon_test), axis=1)
+
+# Threshold
+threshold = np.mean(train_err) + np.std(train_err)
+
+# Predictions
+y_pred = [1 if e > threshold else 0 for e in test_err]
+acc = accuracy_score(y_test, y_pred)
+cm = confusion_matrix(y_test, y_pred)
+
+print("Reconstruction Threshold:", threshold)
+print("Accuracy:", acc)
+
+
+print("Confusion Matrix:\n", cm)
+
+sns.heatmap(cm, annot=True, fmt="d", cmap="Blues")
+plt.title("Confusion Matrix")
+plt.xlabel("Predicted")
+plt.ylabel("Actual")
+plt.show()
+
+# ===== Code Block 18 =====
+# ================== DETAILED EXPLANATIONS ==================
+
+# 1️⃣ Import libraries  
+# We import essential Python libraries for the entire process:
+# - pandas and numpy: for handling and processing ECG data.
+# - tensorflow and keras: for building and training the Autoencoder neural network.
+# - seaborn and matplotlib: for visualizing confusion matrices and loss plots.
+# - sklearn tools: for splitting data, scaling features, and calculating accuracy metrics.
+
+# 2️⃣ Load dataset  
+# The ECG dataset is read using pandas. The last column is the label:  
+#     1 → Normal heartbeat  
+#     0 → Abnormal heartbeat (arrhythmia)
+# The model learns only from "normal" data to recognize healthy heart patterns.
+
+# 3️⃣ Train-Test Split  
+# The dataset is divided into 80% training and 20% testing using train_test_split.
+# Stratify=y ensures that the ratio of normal and abnormal samples remains the same in both sets.
+# Since this is a **novelty detection** task, we train the model only on normal ECG signals (y=1).
+# This allows the Autoencoder to learn the normal heartbeat pattern and later detect deviations as anomalies.
+
+# 4️⃣ Normalize features  
+# ECG signals have values of different scales; normalization ensures all features fall between 0 and 1.
+# MinMaxScaler is used to bring consistency in input values and speed up model convergence.
+# It helps the neural network train more efficiently by preventing certain large-valued features from dominating.
+
+# 5️⃣ Build Autoencoder  
+# The Autoencoder is a type of neural network with two main parts:
+#     🔹 Encoder: Compresses the input into a smaller latent representation (dimensionality reduction).
+#     🔹 Decoder: Reconstructs the original input from this compressed form.
+# The goal is to make the output as close as possible to the input for normal data.
+# Architecture details:
+#     - Several Dense layers with ReLU activations to capture complex ECG patterns.
+#     - Final layer uses Sigmoid activation to output values between 0 and 1 (matching normalized input range).
+# When trained only on normal data, it becomes “specialized” in reconstructing normal signals accurately.
+
+# 6️⃣ Compile model  
+# Optimizer → Adam (learning rate = 0.001): adjusts model weights efficiently using gradient descent.  
+# Loss → Mean Squared Logarithmic Error (MSLE): measures how well the model reconstructs input values.  
+# Lower MSLE = better reconstruction. MSLE is preferred when dealing with non-negative normalized inputs.
+
+# 7️⃣ Train model  
+# The model is trained to minimize reconstruction loss — the difference between input and output.
+# Validation data (X_test_s) helps monitor performance on unseen samples to detect overfitting.
+# A good model will show decreasing training and validation losses that stabilize after a few epochs.
+
+# 8️⃣ Plot training vs validation loss  
+# The loss plot shows how the model learns:
+#     - If both losses decrease smoothly → model learning correctly.
+#     - If validation loss increases while training loss decreases → overfitting.
+# This visualization confirms whether the Autoencoder generalizes well to unseen data.
+
+# 9️⃣ Compute reconstruction error  
+# After training, each input sample is passed through the Autoencoder.
+# The **reconstruction error** is the average squared difference between input and output.
+# For normal signals (trained pattern), error is small.
+# For abnormal signals (new pattern), reconstruction fails → error becomes high.
+
+# 🔟 Set threshold for anomaly detection  
+# We calculate a threshold as:  
+#     threshold = mean(training_error) + std(training_error)
+# Any test sample with reconstruction error greater than this threshold is flagged as an anomaly.
+# This approach works because normal samples have lower reconstruction errors, while anomalies deviate more.
+
+# 11️⃣ Predict anomalies  
+# For each test sample:
+#     If reconstruction_error > threshold → predict as 1 (Anomaly)
+#     Else → predict as 0 (Normal)
+# This simple rule converts reconstruction errors into binary classification (normal vs abnormal).
+
+# 12️⃣ Evaluate model  
+# Accuracy = percentage of correctly classified samples.
+# Confusion Matrix shows how many:
+#     - True Positives (TP): Correctly detected anomalies.
+#     - True Negatives (TN): Correctly detected normals.
+#     - False Positives (FP): Normal signals misclassified as anomalies.
+#     - False Negatives (FN): Anomalies missed by the model.
+# Together, they give a complete picture of performance.
+
+# 13️⃣ Visualize results  
+# The confusion matrix heatmap is plotted using seaborn.
+# It provides a clear visual representation of how well the Autoencoder separates normal and abnormal ECG patterns.
+# Blue shades highlight the magnitude of correctly or incorrectly classified samples.
+
+# ================== SUMMARY OF WORKING ==================
+# 🔹 The Autoencoder learns to perfectly reconstruct normal ECG signals.
+# 🔹 During testing, it attempts to reconstruct both normal and abnormal samples.
+# 🔹 Abnormal ECGs have higher reconstruction error → classified as anomalies.
+# 🔹 The approach is **unsupervised** — no need for labeled anomaly data during training.
+# 🔹 It’s ideal for medical data where abnormal samples are rare but critical to detect.
